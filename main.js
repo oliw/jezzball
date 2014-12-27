@@ -6,6 +6,11 @@ var snakeGame = (function() {
     canvas.height = Height;
     canvas.setAttribute('tabindex', 1);
     var ctx = canvas.getContext("2d");
+    var fps = 20;
+    var now;
+    var then = Date.now();
+    var interval = 1000/fps;
+    var delta;
     var FPS = 1000 * 60;
     
     var NCellX = 30;
@@ -23,13 +28,16 @@ var snakeGame = (function() {
 
     var Player = {
         Score: 0,
-        Color: '#999',
+        HighScore: 0,
         Paint: function() {
             ctx.beginPath();
-            ctx.fillStyle = this.Color;
+            ctx.fillStyle = '#999';
             ctx.font = "normal 10pt Calibri";
-            ctx.textAlign = "left";
-            ctx.fillText("score: " + Player.Score, 10, 10);
+            ctx.fillText("score: " + this.Score+"   highest: "+ this.HighScore, 10, 15);
+        },
+        Reset: function() {
+            this.HighScore = Math.max(this.HighScore, this.Score);
+            this.Score = 0;
         }
     };
 
@@ -44,7 +52,6 @@ var snakeGame = (function() {
             while (SnakeBodyPart != this.FrontSnakeBodyPart) {
                 if (SnakeBodyPart.location.x == this.FrontSnakeBodyPart.location.x 
                     && SnakeBodyPart.location.y == this.FrontSnakeBodyPart.location.y ) {
-                    console.log('Collision');
                     return true;
                 }
                 SnakeBodyPart = SnakeBodyPart.next;
@@ -71,12 +78,9 @@ var snakeGame = (function() {
             this.RearSnakeBodyPart = SnakeBodyPart;
         },
         Paint: function() {
-            ctx.beginPath();
-            ctx.fillStyle = this.Color;
             var SnakeBodyPart = this.RearSnakeBodyPart;
             while (SnakeBodyPart != null) {
-                ctx.rect(SnakeBodyPart.location.x*CellWidth, SnakeBodyPart.location.y*CellHeight, CellWidth, CellHeight);
-                ctx.fill();
+                PaintCell(SnakeBodyPart.location.x,SnakeBodyPart.location.y,this.Color);
                 SnakeBodyPart = SnakeBodyPart.next;
             }
             this.Update();
@@ -113,23 +117,18 @@ var snakeGame = (function() {
         Y: 0,
         Color: '#FFA500',
         IsCollision: function() {
-            var result = (this.X == Math.floor(Snake.FrontSnakeBodyPart.location.x)
-                && this.Y == Math.floor(Snake.FrontSnakeBodyPart.location.y));
+            var result = (this.X == Math.round(Snake.FrontSnakeBodyPart.location.x)
+                && this.Y == Math.round(Snake.FrontSnakeBodyPart.location.y));
             return result;
         },
         Paint: function() {
-            ctx.beginPath();
-            ctx.fillStyle=this.Color;
-            ctx.rect(this.X*CellWidth, this.Y*CellHeight, CellWidth, CellHeight);
-            ctx.fill();
+            PaintCell(this.X,this.Y,this.Color);
         },
         Reset: function() {
-            this.X = Math.floor(Math.random()*((NCellX-1)-0+1)+0);
-            this.Y = Math.floor(Math.random()*((NCellY-1)-0+1)+0);
-            while(Snake.IsHere(this.X,this.Y)) {
+            do {
                 this.X = Math.floor(Math.random()*((NCellX-1)-0+1)+0);
                 this.Y = Math.floor(Math.random()*((NCellY-1)-0+1)+0);
-            }           
+            } while(Snake.IsHere(this.X,this.Y));
         }
     };
 
@@ -150,6 +149,13 @@ var snakeGame = (function() {
         Food.Paint();
     };
 
+    function PaintCell(x,y,color) {
+        ctx.beginPath();
+        ctx.fillStyle=color;
+        ctx.rect(x*CellWidth, y*CellHeight, CellWidth, CellHeight);
+        ctx.fill();
+    }
+
     function KeyPressed(e) {
         e = e || window.event;
         switch (e.keyCode) {
@@ -164,27 +170,22 @@ var snakeGame = (function() {
 
     function Loop() {
         init = requestAnimFrame(Loop);
-        Paint();
-        if (Snake.IsCollision()) {
-             Player.Score = 0;
-             Snake.Reset();
-        } else if (Food.IsCollision()) {
-            Food.Reset();
-            Snake.Grow();
-            Player.Score++;
+        now = Date.now();
+        delta = now - then;
+        if (delta > interval) {
+            Paint();
+            if (Snake.IsCollision()) {
+                 Player.Reset();
+                 Snake.Reset();
+            } else if (Food.IsCollision()) {
+                Food.Reset();
+                Snake.Grow();
+                Player.Score++;
+            }
+            then = now - (delta % interval);
         }
     };
 
-    function GameOver(win) {
-        cancelRequestAnimFrame(init);
-        BG.Paint();
-        ctx.fillStyle = "#999";
-        ctx.font = "bold 40px Calibri";
-        ctx.textAlign = "center";
-        ctx.fillText((win ? "YOU WON!" : "GAME OVER"), Width / 2, Height / 2);
-        ctx.font = "normal 16px Calibri";
-        ctx.fillText("refresh to replay", Width / 2, Height / 2 + 20);
-    };
     return {
         NewGame: function() {
             Snake.Reset();
