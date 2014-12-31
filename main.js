@@ -1,4 +1,4 @@
-var snakeGame = (function() {
+var Game = (function() {
     var Width = 500;
     var Height = 500;
     var canvas = document.getElementById("game");
@@ -12,11 +12,9 @@ var snakeGame = (function() {
     var interval = 1000/fps;
     var delta;
     var FPS = 1000 * 60;
-    
-    var NCellX = 30;
-    var NCellY = 30;
-    var CellWidth = Width / NCellX;
-    var CellHeight = Height / NCellY;
+
+    var Balls = [];
+
 
     var BG = {
         Color: '#333',
@@ -27,8 +25,7 @@ var snakeGame = (function() {
     };
 
     var Player = {
-        Score: 0,
-        HighScore: 0,
+        Level: 0,
         Paint: function() {
             ctx.beginPath();
             ctx.fillStyle = '#999';
@@ -36,101 +33,47 @@ var snakeGame = (function() {
             ctx.fillText("score: " + this.Score+"   highest: "+ this.HighScore, 10, 15);
         },
         Reset: function() {
-            this.HighScore = Math.max(this.HighScore, this.Score);
-            this.Score = 0;
+            this.Level++;
         }
     };
 
-    var Snake = {
-        RearSnakeBodyPart: null,
-        FrontSnakeBodyPart: null,
-        Color: '#999',
-        VelX: 0,
-        VelY: 0,
-        IsCollision: function() {
-            var SnakeBodyPart = this.RearSnakeBodyPart;
-            while (SnakeBodyPart != this.FrontSnakeBodyPart) {
-                if (SnakeBodyPart.location.x == this.FrontSnakeBodyPart.location.x 
-                    && SnakeBodyPart.location.y == this.FrontSnakeBodyPart.location.y ) {
-                    return true;
-                }
-                SnakeBodyPart = SnakeBodyPart.next;
-            }
-            return false;
-        },
-        IsHere: function(x,y) {
-            var SnakeBodyPart = this.RearSnakeBodyPart;
-            while (SnakeBodyPart != this.FrontSnakeBodyPart) {
-                if (SnakeBodyPart.location.x <= x 
-                    &&  x < SnakeBodyPart.location.x+CellWidth
-                    && SnakeBodyPart.location.y <= y
-                    && y < SnakeBodyPart.location.y+CellHeight) {
-                    return true;
-                }
-                SnakeBodyPart = SnakeBodyPart.next;
-            }
-            return false;
-        },
-        Grow: function() {
-            var SnakeBodyPart = this.RearSnakeBodyPart;
+    function Ball() {
+        this.X = 0;
+        this.Y = 0;
+        this.VelX = 0;
+        this.VelY = 0;
+
+        this.Color ='#FF0000';
+        this.Radius = 5;
+
+        this.Paint = function() {
+            ctx.beginPath();
+            ctx.fillStyle = this.Color;
+            ctx.arc(this.X, this.Y, this.Radius, 0, Math.PI * 2, false);
+            ctx.fill();
             this.Update();
-            SnakeBodyPart.next = this.RearSnakeBodyPart;
-            this.RearSnakeBodyPart = SnakeBodyPart;
-        },
-        Paint: function() {
-            var SnakeBodyPart = this.RearSnakeBodyPart;
-            while (SnakeBodyPart != null) {
-                PaintCell(SnakeBodyPart.location.x,SnakeBodyPart.location.y,this.Color);
-                SnakeBodyPart = SnakeBodyPart.next;
+        };
+        this.Update = function() {
+            this.X += this.VelX;
+            this.Y += this.VelY;
+            if (this.X-this.Radius/2 <= 0 || this.X+this.Radius/2 >= Width) {
+                this.VelX *= -1;
             }
-            this.Update();
-        },
-        Update: function() {
-            var SnakeBodyPart = {
-                location: {
-                    x: ((this.FrontSnakeBodyPart.location.x + this.VelX) % NCellX + NCellX) % NCellX,
-                    y: ((this.FrontSnakeBodyPart.location.y + this.VelY) % NCellY + NCellY) % NCellY,
-                },
-                next:null
-            };
-            this.FrontSnakeBodyPart.next = SnakeBodyPart;
-            this.FrontSnakeBodyPart = SnakeBodyPart;
-            this.RearSnakeBodyPart = this.RearSnakeBodyPart.next;
-        },
-        Reset: function() {
-            var SnakeBodyPart = {
-                location: {
-                    x: Math.floor(NCellX/2),
-                    y: Math.floor(NCellY/2)
-                },
-                next: null
-            };
-            this.RearSnakeBodyPart = SnakeBodyPart;
-            this.FrontSnakeBodyPart = SnakeBodyPart;
-            this.VelX = 1;
-            this.VelY = 0;
-        }
+            if (this.Y-this.Radius/2 <= 0 || this.Y+this.Radius/2 >= Height) {
+                this.VelY *= -1;
+            }
+        };
+        this.Reset = function() {
+            this.X = getRandomInt(0, Width);
+            this.Y = getRandomInt(0, Height);
+            this.VelX = (!!Math.round(Math.random() * 1) ? 1.5 : -1.5);
+            this.VelY = (!!Math.round(Math.random() * 1) ? 1.5 : -1.5);
+        };
     };
 
-    var Food = {
-        X: 0,
-        Y: 0,
-        Color: '#FFA500',
-        IsCollision: function() {
-            var result = (this.X == Math.round(Snake.FrontSnakeBodyPart.location.x)
-                && this.Y == Math.round(Snake.FrontSnakeBodyPart.location.y));
-            return result;
-        },
-        Paint: function() {
-            PaintCell(this.X,this.Y,this.Color);
-        },
-        Reset: function() {
-            do {
-                this.X = Math.floor(Math.random()*((NCellX-1)-0+1)+0);
-                this.Y = Math.floor(Math.random()*((NCellY-1)-0+1)+0);
-            } while(Snake.IsHere(this.X,this.Y));
-        }
-    };
+    function getRandomInt(min, max) {
+        return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
 
     window.requestAnimFrame = (function() {
         return window.requestAnimationFrame || window.webkitRequestAnimationFrame || window.mozRequestAnimationFrame || window.oRequestAnimationFrame || window.msRequestAnimationFrame || function(callback) {
@@ -144,29 +87,11 @@ var snakeGame = (function() {
     function Paint() {
         ctx.beginPath();
         BG.Paint();
-        Player.Paint();
-        Snake.Paint();
-        Food.Paint();
+        Balls.forEach(function(ball) {
+            ball.Paint();
+        });
     };
 
-    function PaintCell(x,y,color) {
-        ctx.beginPath();
-        ctx.fillStyle=color;
-        ctx.rect(x*CellWidth, y*CellHeight, CellWidth, CellHeight);
-        ctx.fill();
-    }
-
-    function KeyPressed(e) {
-        e = e || window.event;
-        switch (e.keyCode) {
-            case 87: if (Snake.VelY == 0) {Snake.VelX = 0; Snake.VelY = -1;} break;
-            case 68: if (Snake.VelX == 0) {Snake.VelX = 1; Snake.VelY = 0;} break;
-            case 83: if (Snake.VelY == 0) {Snake.VelX = 0; Snake.VelY = 1;} break;
-            case 65: if (Snake.VelX == 0) {Snake.VelX = -1; Snake.VelY = 0;} break;
-        }
-    };
-
-    canvas.addEventListener("keydown", KeyPressed, true);
 
     function Loop() {
         init = requestAnimFrame(Loop);
@@ -174,25 +99,17 @@ var snakeGame = (function() {
         delta = now - then;
         if (delta > interval) {
             Paint();
-            if (Snake.IsCollision()) {
-                 Player.Reset();
-                 Snake.Reset();
-            } else if (Food.IsCollision()) {
-                Food.Reset();
-                Snake.Grow();
-                Player.Score++;
-            }
             then = now - (delta % interval);
         }
     };
 
     return {
         NewGame: function() {
-            Snake.Reset();
-            Food.Reset();
-            Player.Score = 0;
+            var ball = new Ball();
+            ball.Reset();
+            Balls.push(ball);
             Loop();
         }
     };
 })();
-snakeGame.NewGame();
+Game.NewGame();
